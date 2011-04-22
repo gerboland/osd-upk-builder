@@ -1,2 +1,2 @@
 bin_PROGRAMS = upk-builder
-upk-builder_SOURCES = package.c
+upk_builder_SOURCES = package.c crc32.c
