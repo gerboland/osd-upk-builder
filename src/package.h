@@ -30,7 +30,7 @@
 #ifndef PACKAGE_H
 #define PACKAGE_H
 
-#define VERSION "3.01"
+//#define VERSION "3.01"
 #define FLASH_16M 1
 #define NAMELEN   32
 #define VERLEN    20 /* should same as the uboot */
