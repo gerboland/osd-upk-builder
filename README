@@ -5,7 +5,9 @@ UPK files. Usage:
 
 Read below for explanation of the arguments
 
-## Introduction to UPK files
+Introduction to UPK files
+================================
+
 Nobody wants a bricked OSD (I've got one, it's not much fun), so it is 
 important to ensure that any community-supplied UPK update doesn't touch 
 the core bootloader.
@@ -18,7 +20,9 @@ SD-card or CF-card with a UPK file precisely located at `newpackage/r3.upk`
 
 We would like to ensure this remains untouched by a firmware update.
 
-## Make-up of a UPK
+Make-up of a UPK
+-------------------------
+
 UPKs can contain individual updates to the following parts of the OSD's firmware:
 
 * MSP430 chip
@@ -44,7 +48,9 @@ So to make a safe UPK which works, you must omit U-boot and its env vars,
 but ensure the U-boot version string matches that already installed on the 
 unit. Similar rule applies if you omit the kernel.
 
-##How UPK is actually made
+How UPK is actually made
+-------------------------
+
 In Neuros' firmware build scripts, this is managed by the 
 `neuros-bsp/build-helper.sh` script, in the `make_upk()` method. A (open-source) 
 tool named `packet_16M` is built in `linux-r3-extra-apps/upgrade-tools/uboot-tools` 
@@ -82,7 +88,9 @@ apply over whatever firmware version exists. Then you have a safe UPK file to
 give to a user.
 
 
-###Note 1
+Note 1
+-------------------------
+
 There is both a Root filesystem and an Extended filesystem because original OSD 
 units had only 16MB of internal storage (NOR flash). Under 15MB of this is 
 available for software. Later in the device's lifetime, this was found to be 
