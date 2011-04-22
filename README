@@ -1,20 +1,115 @@
-This is the tool to generate the OSD upgrading package.
+This is the tool to generate the OSD upgrade packages. They're called 
+UPK files. Usage:
 
-1. Compile the tool
-   gcc crc32.c package.c -o osdpkg
+   ./upk-builder nh [upk_desc] [upk_name] [bins ...]
 
-2. Copy tool to neuros-bsp/images
+Read below for explanation of the arguments
 
-3. Create upk
-   ./osdpkg nh [upk_desc] [upk_name] [bins ...]
+## Introduction to UPK files
+Nobody wants a bricked OSD (I've got one, it's not much fun), so it is 
+important to ensure that any community-supplied UPK update doesn't touch 
+the core bootloader.
 
-You can choose to either generate a full package that includes each
-binary or a package just for that part that has been changed.
+The OSD's core bootloader - Das U-boot - contains code which offers the 
+[Emergency Firmware Upgrade](http://neurostechnology.com/neuros-osd-emergency-upgrade-instructions) 
+mechanism, to allow one to recover a non-booting unit by detecting an 
+SD-card or CF-card with a UPK file precisely located at `newpackage/r3.upk` 
+(and usually a file of name `newpackage/disable_upk_version_check`).
 
-Example:
-<1> To create a upk by including everything
-   ./osdpkg nh "upk by yada_yada on 2006-10-18" r3.upk env.img
-u-boot.bin uImage root.cramfs
+We would like to ensure this remains untouched by a firmware update.
 
-<2> To create a upk by just including the rootfs
-   ./osdpkg nh "upk by blah_blah on 2006-10-18" r3.upk root.cramfs
+## Make-up of a UPK
+UPKs can contain individual updates to the following parts of the OSD's firmware:
+
+* MSP430 chip
+* U-boot bootloader (`u-boot.bin`)
+* Bootloader environment variables (`env.img`)
+* Kernel (`uImage`)
+* Root filesystem (`root.cramfs`) - limited in size to under 15MB
+* Extended filesystem (`programs_*.tar.gz`) - see Note 1 below
+
+But all parts are optional, so critical parts like U-boot and its env vars 
+can be omitted.
+
+U-boot, Kernel, Root & Extended filesystems are versioned - they have individual 
+version strings. These are checked before installation - though the check 
+is ignored if the `disable_upk_version_check` file exists. If the version 
+is older than that on the unit, it is not installed.
+
+**But even if U-boot and/or the kernel is not contained in the UPK, the 
+version string must _exactly match_ that installed on the unit. If not, the 
+update will not proceed.**
+
+So to make a safe UPK which works, you must omit U-boot and its env vars, 
+but ensure the U-boot version string matches that already installed on the 
+unit. Similar rule applies if you omit the kernel.
+
+##How UPK is actually made
+In Neuros' firmware build scripts, this is managed by the 
+`neuros-bsp/build-helper.sh` script, in the `make_upk()` method. A (open-source) 
+tool named `packet_16M` is built in `linux-r3-extra-apps/upgrade-tools/uboot-tools` 
+during the build, and is copied into `neuros-bsp/images`.
+
+Also copied into `neuros-bsp/images` are (among other things):
+    env.img
+    extapp.version
+    root.cramfs
+    rootfs.version
+    u-boot.bin
+    u-boot.version
+    uImage
+    uImage.version
+    programs/extapp.version
+    programs_0.tar.gz
+The *.version files are generated somehow (I don't see how just yet) containing 
+just the version strings of the form: `A.BC-D.EF-GH.IJK`. See 
+[here](http://wiki.neurostechnology.com/index.php/Developer_FAQ#Beta_.26_Production_Release_Version) 
+for the explanation of this. Slightly over-engineered IMO!
+
+Then these files are integrated into a UPK file with the command
+    ./packet_16M nh "Identifying String" dev.upk u-boot.bin env.img uImage root.cramfs programs_0.tar.gz
+which creates a `dev.upk` file in that directory. ('nh' means no firmware for 
+MSP430 - we'll leave that alone too)
+
+This tool uses the filename to determine what kind of file is supplied, and 
+opens the relevant `.version` file to incorporate its version string. The tool 
+is flexible enough that we can omit U-boot and its env vars, so this will work 
+too:
+    ./packet_16M nh 'Safer UPK' dev.upk uImage root.cramfs programs_0.tar.gz
+
+But make sure that the `*.version` files contain the correct version strings to 
+apply over whatever firmware version exists. Then you have a safe UPK file to 
+give to a user.
+
+
+###Note 1
+There is both a Root filesystem and an Extended filesystem because original OSD 
+units had only 16MB of internal storage (NOR flash). Under 15MB of this is 
+available for software. Later in the device's lifetime, this was found to be 
+insufficient so Neuros offered customers free 128MB CF cards to extend the 
+internal storage for newer firmwares. 
+
+New OSDs (version 1.15 I think) contain 128MB of internal NAND flash - but lack 
+a CF card slot.
+
+NOR flash is primarily read-only, each block capable of only around 100,000 
+write cycles before expiry. It has fast read speeds but very slow writes, thus 
+it is usually used as a read-only medium. The Cramfs filesystem is a compressed 
+read-only filesystem which is good for use on NOR flash, and the OSD uses this. 
+Note that Squashfs is a newer equivalent, with better read speeds and higher 
+compression ratios, and is worth investigating.
+
+NAND flash has a similar number of write cycles, but writes are much faster, so 
+is mostly used as a read-write filesystem with particular formatting - jffs2 is 
+used for this. This distributes all writes over all the blocks - known as 
+wear-leveling - to prolong the life of the medium.
+
+Note also that the OSD has a 1MB designated read-write partition for settings - 
+this is most notable on the older units. It is located at /mnt/OSD and uses 
+jffs2 filesystem. For older units, this works ok but the number of writes to 
+this should be minimised. This partition is untouched by any UPK installation, 
+so settings are always preserved.
+
+Thus all OSD units contain a read-only root filesystem, and a read-write 
+filesystem in /media/ext. The underlying hardware differences are moot.
+
