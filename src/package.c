@@ -30,6 +30,7 @@
  *                      change follow the new UPK structure
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
